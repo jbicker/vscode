@@ -13,6 +13,7 @@ import { FindInput, IFindInputStyles } from 'vs/base/browser/ui/findinput/findIn
 import { IIdentityProvider, IKeyboardNavigationLabelProvider, IListContextMenuEvent, IListDragAndDrop, IListDragOverReaction, IListMouseEvent, IListRenderer, IListVirtualDelegate } from 'vs/base/browser/ui/list/list';
 import { ElementsDragAndDropData } from 'vs/base/browser/ui/list/listView';
 import { IListOptions, IListStyles, isButton, isInputElement, isMonacoEditor, List, MouseController } from 'vs/base/browser/ui/list/listWidget';
+import { Toggle } from 'vs/base/browser/ui/toggle/toggle';
 import { getVisibleState, isFilterResult } from 'vs/base/browser/ui/tree/indexTreeModel';
 import { ICollapseStateChangeEvent, ITreeContextMenuEvent, ITreeDragAndDrop, ITreeEvent, ITreeFilter, ITreeModel, ITreeModelSpliceEvent, ITreeMouseEvent, ITreeNavigator, ITreeNode, ITreeRenderer, TreeDragOverBubble, TreeError, TreeFilterResult, TreeMouseEventTarget, TreeVisibility } from 'vs/base/browser/ui/tree/tree';
 import { Action } from 'vs/base/common/actions';
@@ -20,10 +21,11 @@ import { distinct, equals, firstOrDefault, range } from 'vs/base/common/arrays';
 import { disposableTimeout, timeout } from 'vs/base/common/async';
 import { Codicon } from 'vs/base/common/codicons';
 import { SetMap } from 'vs/base/common/collections';
+import { Color } from 'vs/base/common/color';
 import { Emitter, Event, EventBufferer, Relay } from 'vs/base/common/event';
 import { fuzzyScore, FuzzyScore } from 'vs/base/common/filters';
 import { KeyCode } from 'vs/base/common/keyCodes';
-import { Disposable, DisposableStore, dispose, IDisposable, MutableDisposable, toDisposable } from 'vs/base/common/lifecycle';
+import { Disposable, DisposableStore, dispose, IDisposable, toDisposable } from 'vs/base/common/lifecycle';
 import { clamp } from 'vs/base/common/numbers';
 import { ScrollEvent } from 'vs/base/common/scrollable';
 import { ISpliceable } from 'vs/base/common/sequence';
@@ -649,9 +651,29 @@ class TypeFilter<T> implements ITreeFilter<T, FuzzyScore | LabelFuzzyScore>, IDi
 	}
 }
 
-export interface ITypeFilterWidgetStyles extends IFindInputStyles, IListStyles {
-
+export interface ICaseSensitiveToggleOpts {
+	readonly isChecked: boolean;
+	readonly inputActiveOptionBorder?: Color;
+	readonly inputActiveOptionForeground?: Color;
+	readonly inputActiveOptionBackground?: Color;
 }
+
+export class CaseSensitiveToggle extends Toggle {
+	constructor(opts?: ICaseSensitiveToggleOpts) {
+		super({
+			icon: Codicon.filter,
+			title: localize('filter', "Filter"),
+			isChecked: opts?.isChecked ?? false,
+			inputActiveOptionBorder: opts?.inputActiveOptionBorder,
+			inputActiveOptionForeground: opts?.inputActiveOptionForeground,
+			inputActiveOptionBackground: opts?.inputActiveOptionBackground
+		});
+	}
+}
+
+export interface ITypeFilterWidgetStyles extends IFindInputStyles, IListStyles { }
+
+export interface ITypeFilterWidgetOpts extends ITypeFilterWidgetStyles { }
 
 class TypeFilterWidget extends Disposable {
 
@@ -668,14 +690,22 @@ class TypeFilterWidget extends Disposable {
 	constructor(
 		container: HTMLElement,
 		contextViewProvider: IContextViewProvider,
-		disable: () => void
+		disable: () => void,
+		options?: ITypeFilterWidgetOpts
 	) {
 		super();
 
 		container.appendChild(this.elements.root);
 		this._register(toDisposable(() => container.removeChild(this.elements.root)));
 
-		this.findInput = this._register(new FindInput(this.elements.findInput, contextViewProvider, false, { label: 'what' }));
+		this.findInput = this._register(new FindInput(this.elements.findInput, contextViewProvider, false, {
+			label: 'todo',
+			additionalToggles: [new CaseSensitiveToggle({
+				...options,
+				isChecked: false // TODO
+			})]
+		}));
+
 		this.actionbar = this._register(new ActionBar(this.elements.actionbar));
 
 		const emitter = this._register(new DomEmitter(this.findInput.inputBox.inputElement, 'keydown'));
@@ -690,6 +720,7 @@ class TypeFilterWidget extends Disposable {
 		this.actionbar.push(closeAction, { icon: true, label: false });
 
 		this.onDidChangeValue = this.findInput.onDidChange;
+		this.style(options ?? {});
 	}
 
 	style(styles: ITypeFilterWidgetStyles): void {
@@ -786,14 +817,9 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 			return;
 		}
 
-		this.widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider, () => this.disable());
+		this.widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider, () => this.disable(), this.styles);
 		this.enabledDisposables.add(this.widget);
 		this.widget.onDidChangeValue(this.onDidChangeValue, this, this.enabledDisposables);
-
-		if (this.styles) {
-			this.widget.style(this.styles);
-		}
-
 		this.widget.focus();
 	}
 
