@@ -620,6 +620,10 @@ export class AsyncDataTree<TInput, T, TFilterData = void> implements IDisposable
 		this.tree.toggleKeyboardNavigation();
 	}
 
+	enableTypeFilter(): void {
+		this.tree.enableTypeFilter();
+	}
+
 	refilter(): void {
 		this.tree.refilter();
 	}

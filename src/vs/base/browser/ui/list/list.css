@@ -91,6 +91,11 @@
 	right: 4px;
 	display: flex;
 	padding: 3px;
+	transition: top 0.3s;
+}
+
+.monaco-tree-type-filter.disabled {
+	top: -40px;
 }
 
 .monaco-tree-type-filter-grab {

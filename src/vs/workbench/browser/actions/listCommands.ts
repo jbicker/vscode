@@ -17,6 +17,7 @@ import { DataTree } from 'vs/base/browser/ui/tree/dataTree';
 import { ITreeNode } from 'vs/base/browser/ui/tree/tree';
 import { CommandsRegistry } from 'vs/platform/commands/common/commands';
 import { Table } from 'vs/base/browser/ui/table/tableWidget';
+import { AbstractTree } from 'vs/base/browser/ui/tree/abstractTree';
 
 function ensureDOMFocus(widget: ListWidget | undefined): void {
 	// it can happen that one of the commands is executed while
@@ -628,6 +629,27 @@ CommandsRegistry.registerCommand({
 		else if (focused instanceof ObjectTree || focused instanceof DataTree || focused instanceof AsyncDataTree) {
 			const tree = focused;
 			tree.updateOptions({ filterOnType: !tree.filterOnType });
+		}
+	}
+});
+
+KeybindingsRegistry.registerCommandAndKeybindingRule({
+	id: 'list.filter',
+	weight: KeybindingWeight.WorkbenchContrib,
+	when: WorkbenchListFocusContextKey,
+	primary: KeyMod.CtrlCmd | KeyCode.KeyF,
+	handler: (accessor) => {
+		const widget = accessor.get(IListService).lastFocusedList;
+
+		// List
+		if (widget instanceof List || widget instanceof PagedList || widget instanceof Table) {
+			// TODO@joao
+		}
+
+		// Tree
+		else if (widget instanceof AbstractTree || widget instanceof AsyncDataTree) {
+			const tree = widget;
+			tree.enableTypeFilter();
 		}
 	}
 });

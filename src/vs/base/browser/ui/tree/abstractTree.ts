@@ -5,6 +5,7 @@
 
 import { IDragAndDropData } from 'vs/base/browser/dnd';
 import { $, append, clearNode, createStyleSheet, h, hasParentWithClass } from 'vs/base/browser/dom';
+import { DomEmitter } from 'vs/base/browser/event';
 import { StandardKeyboardEvent } from 'vs/base/browser/keyboardEvent';
 import { ActionBar } from 'vs/base/browser/ui/actionbar/actionbar';
 import { IContextViewProvider } from 'vs/base/browser/ui/contextview/contextview';
@@ -16,7 +17,7 @@ import { getVisibleState, isFilterResult } from 'vs/base/browser/ui/tree/indexTr
 import { ICollapseStateChangeEvent, ITreeContextMenuEvent, ITreeDragAndDrop, ITreeEvent, ITreeFilter, ITreeModel, ITreeModelSpliceEvent, ITreeMouseEvent, ITreeNavigator, ITreeNode, ITreeRenderer, TreeDragOverBubble, TreeError, TreeFilterResult, TreeMouseEventTarget, TreeVisibility } from 'vs/base/browser/ui/tree/tree';
 import { Action } from 'vs/base/common/actions';
 import { distinct, equals, firstOrDefault, range } from 'vs/base/common/arrays';
-import { disposableTimeout } from 'vs/base/common/async';
+import { disposableTimeout, timeout } from 'vs/base/common/async';
 import { Codicon } from 'vs/base/common/codicons';
 import { SetMap } from 'vs/base/common/collections';
 import { Emitter, Event, EventBufferer, Relay } from 'vs/base/common/event';
@@ -664,20 +665,28 @@ class TypeFilterWidget extends Disposable {
 	private readonly actionbar: ActionBar;
 	readonly onDidChangeValue: Event<string>;
 
-	private _onDidClose = this._register(new Emitter<void>());
-	readonly onDidClose: Event<void> = this._onDidClose.event;
-
 	constructor(
 		container: HTMLElement,
-		contextViewProvider: IContextViewProvider
+		contextViewProvider: IContextViewProvider,
+		disable: () => void
 	) {
 		super();
 
 		container.appendChild(this.elements.root);
+		this._register(toDisposable(() => container.removeChild(this.elements.root)));
+
 		this.findInput = this._register(new FindInput(this.elements.findInput, contextViewProvider, false, { label: 'what' }));
 		this.actionbar = this._register(new ActionBar(this.elements.actionbar));
 
-		const closeAction = this._register(new Action('close', localize('close', "Close"), 'codicon codicon-close', true, () => this._onDidClose.fire()));
+		const emitter = this._register(new DomEmitter(this.findInput.inputBox.inputElement, 'keydown'));
+		const onEscape = this._register(Event.chain(emitter.event))
+			.map(e => new StandardKeyboardEvent(e))
+			.filter(e => e.keyCode === KeyCode.Escape)
+			.event;
+
+		this._register(onEscape(() => disable()));
+
+		const closeAction = this._register(new Action('close', localize('close', "Close"), 'codicon codicon-close', true, () => disable()));
 		this.actionbar.push(closeAction, { icon: true, label: false });
 
 		this.onDidChangeValue = this.findInput.onDidChange;
@@ -694,6 +703,15 @@ class TypeFilterWidget extends Disposable {
 			this.elements.root.style.boxShadow = `0 0 8px 2px ${styles.listFilterWidgetShadow}`;
 		}
 	}
+
+	focus() {
+		this.findInput.focus();
+	}
+
+	async disable(): Promise<void> {
+		this.elements.root.classList.add('disabled');
+		await timeout(300);
+	}
 }
 
 class TypeFilterController<T, TFilterData> implements IDisposable {
@@ -707,12 +725,11 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	private _empty: boolean = false;
 	get empty(): boolean { return this._empty; }
 
-	private get enabled(): boolean { return !!this.widget.value; }
-
 	private readonly _onDidChangeEmptyState = new Emitter<boolean>();
 	readonly onDidChangeEmptyState: Event<boolean> = Event.latch(this._onDidChangeEmptyState.event);
 
-	private widget = new MutableDisposable<TypeFilterWidget>();
+	private widget: TypeFilterWidget | undefined;
+	private styles: ITypeFilterWidgetStyles | undefined;
 	// private messageDomNode: HTMLElement;
 
 	// private triggered = false;
@@ -738,9 +755,6 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 
 		model.onDidSplice(this.onDidSpliceModel, this, this.disposables);
 		this.updateOptions(tree.options);
-
-		this.disposables.add(this.widget);
-		this.enable();
 	}
 
 	updateOptions(options: IAbstractTreeOptions<T, TFilterData>): void {
@@ -767,23 +781,32 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	// 	}
 	// }
 
-	private enable(): void {
-		if (this.enabled) {
+	enable(): void {
+		if (this.widget) {
 			return;
 		}
 
-		const widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider);
-		this.widget.value = widget;
+		this.widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider, () => this.disable());
+		this.enabledDisposables.add(this.widget);
+		this.widget.onDidChangeValue(this.onDidChangeValue, this, this.enabledDisposables);
 
-		widget.onDidChangeValue(this.onDidChangeValue, this, this.enabledDisposables);
+		if (this.styles) {
+			this.widget.style(this.styles);
+		}
+
+		this.widget.focus();
 	}
 
-	private disable(): void {
-		if (!this.enabled) {
+	disable(): void {
+		if (!this.widget) {
 			return;
 		}
 
-		this.widget.value = undefined;
+		this.widget.disable();
+		this.widget = undefined;
+
+		this.onDidChangeValue('');
+		this.tree.domFocus();
 	}
 
 	// private onEventOrInput(e: MouseEvent | StandardKeyboardEvent | string): void {
@@ -820,14 +843,10 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 		}
 
 		this.render();
-
-		// if (!pattern) {
-		// 	this.triggered = false;
-		// }
 	}
 
 	private onDidSpliceModel(): void {
-		if (!this.enabled || this.pattern.length === 0) {
+		if (!this.widget || this.pattern.length === 0) {
 			return;
 		}
 
@@ -861,7 +880,7 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	}
 
 	shouldAllowFocus(node: ITreeNode<T, TFilterData>): boolean {
-		if (!this.enabled || !this.pattern || this.filterOnType) {
+		if (!this.widget || !this.pattern || this.filterOnType) {
 			return true;
 		}
 
@@ -873,7 +892,8 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	}
 
 	style(styles: ITypeFilterWidgetStyles): void {
-		this.widget.value?.style(styles);
+		this.styles = styles;
+		this.widget?.style(styles);
 	}
 
 	dispose() {
@@ -1536,6 +1556,10 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 		// if (this.typeFilterController) {
 		// 	this.typeFilterController.toggle();
 		// }
+	}
+
+	enableTypeFilter(): void {
+		this.typeFilterController?.enable();
 	}
 
 	refilter(): void {
