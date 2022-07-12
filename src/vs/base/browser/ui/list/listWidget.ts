@@ -971,7 +971,7 @@ export interface IListStyles extends IFindInputStyles {
 	listFilterWidgetBackground?: Color;
 	listFilterWidgetOutline?: Color;
 	listFilterWidgetNoMatchesOutline?: Color;
-	listMatchesShadow?: Color;
+	listFilterWidgetShadow?: Color;
 	treeIndentGuidesStroke?: Color;
 	tableColumnsBorder?: Color;
 	tableOddRowsBackgroundColor?: Color;

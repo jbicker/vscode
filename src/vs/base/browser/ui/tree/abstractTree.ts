@@ -4,8 +4,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { IDragAndDropData } from 'vs/base/browser/dnd';
-import { $, append, clearNode, createStyleSheet, hasParentWithClass } from 'vs/base/browser/dom';
+import { $, append, clearNode, createStyleSheet, h, hasParentWithClass } from 'vs/base/browser/dom';
 import { StandardKeyboardEvent } from 'vs/base/browser/keyboardEvent';
+import { ActionBar } from 'vs/base/browser/ui/actionbar/actionbar';
 import { IContextViewProvider } from 'vs/base/browser/ui/contextview/contextview';
 import { FindInput, IFindInputStyles } from 'vs/base/browser/ui/findinput/findInput';
 import { IIdentityProvider, IKeyboardNavigationLabelProvider, IListContextMenuEvent, IListDragAndDrop, IListDragOverReaction, IListMouseEvent, IListRenderer, IListVirtualDelegate } from 'vs/base/browser/ui/list/list';
@@ -13,6 +14,7 @@ import { ElementsDragAndDropData } from 'vs/base/browser/ui/list/listView';
 import { IListOptions, IListStyles, isButton, isInputElement, isMonacoEditor, List, MouseController } from 'vs/base/browser/ui/list/listWidget';
 import { getVisibleState, isFilterResult } from 'vs/base/browser/ui/tree/indexTreeModel';
 import { ICollapseStateChangeEvent, ITreeContextMenuEvent, ITreeDragAndDrop, ITreeEvent, ITreeFilter, ITreeModel, ITreeModelSpliceEvent, ITreeMouseEvent, ITreeNavigator, ITreeNode, ITreeRenderer, TreeDragOverBubble, TreeError, TreeFilterResult, TreeMouseEventTarget, TreeVisibility } from 'vs/base/browser/ui/tree/tree';
+import { Action } from 'vs/base/common/actions';
 import { distinct, equals, firstOrDefault, range } from 'vs/base/common/arrays';
 import { disposableTimeout } from 'vs/base/common/async';
 import { Codicon } from 'vs/base/common/codicons';
@@ -25,6 +27,7 @@ import { clamp } from 'vs/base/common/numbers';
 import { ScrollEvent } from 'vs/base/common/scrollable';
 import { ISpliceable } from 'vs/base/common/sequence';
 import 'vs/css!./media/tree';
+import { localize } from 'vs/nls';
 
 class TreeElementsDragAndDropData<T, TFilterData, TContext> extends ElementsDragAndDropData<T, TContext> {
 
@@ -645,6 +648,54 @@ class TypeFilter<T> implements ITreeFilter<T, FuzzyScore | LabelFuzzyScore>, IDi
 	}
 }
 
+export interface ITypeFilterWidgetStyles extends IFindInputStyles, IListStyles {
+
+}
+
+class TypeFilterWidget extends Disposable {
+
+	private readonly elements = h('div.monaco-tree-type-filter', [
+		h('div.monaco-tree-type-filter-grab.codicon.codicon-debug-gripper', { $: 'grab' }),
+		h('div.monaco-tree-type-filter-input', { $: 'findInput' }),
+		h('div.monaco-tree-type-filter-actionbar', { $: 'actionbar' }),
+	]);
+
+	private readonly findInput: FindInput;
+	private readonly actionbar: ActionBar;
+	readonly onDidChangeValue: Event<string>;
+
+	private _onDidClose = this._register(new Emitter<void>());
+	readonly onDidClose: Event<void> = this._onDidClose.event;
+
+	constructor(
+		container: HTMLElement,
+		contextViewProvider: IContextViewProvider
+	) {
+		super();
+
+		container.appendChild(this.elements.root);
+		this.findInput = this._register(new FindInput(this.elements.findInput, contextViewProvider, false, { label: 'what' }));
+		this.actionbar = this._register(new ActionBar(this.elements.actionbar));
+
+		const closeAction = this._register(new Action('close', localize('close', "Close"), 'codicon codicon-close', true, () => this._onDidClose.fire()));
+		this.actionbar.push(closeAction, { icon: true, label: false });
+
+		this.onDidChangeValue = this.findInput.onDidChange;
+	}
+
+	style(styles: ITypeFilterWidgetStyles): void {
+		this.findInput.style(styles);
+
+		if (styles.listFilterWidgetBackground) {
+			this.elements.root.style.backgroundColor = styles.listFilterWidgetBackground.toString();
+		}
+
+		if (styles.listFilterWidgetShadow) {
+			this.elements.root.style.boxShadow = `0 0 8px 2px ${styles.listFilterWidgetShadow}`;
+		}
+	}
+}
+
 class TypeFilterController<T, TFilterData> implements IDisposable {
 
 	private _pattern = '';
@@ -656,12 +707,12 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	private _empty: boolean = false;
 	get empty(): boolean { return this._empty; }
 
-	private get enabled(): boolean { return !!this.findInput.value; }
+	private get enabled(): boolean { return !!this.widget.value; }
 
 	private readonly _onDidChangeEmptyState = new Emitter<boolean>();
 	readonly onDidChangeEmptyState: Event<boolean> = Event.latch(this._onDidChangeEmptyState.event);
 
-	private findInput = new MutableDisposable<FindInput>();
+	private widget = new MutableDisposable<TypeFilterWidget>();
 	// private messageDomNode: HTMLElement;
 
 	// private triggered = false;
@@ -688,7 +739,7 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 		model.onDidSplice(this.onDidSpliceModel, this, this.disposables);
 		this.updateOptions(tree.options);
 
-		this.disposables.add(this.findInput);
+		this.disposables.add(this.widget);
 		this.enable();
 	}
 
@@ -721,19 +772,19 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 			return;
 		}
 
-		const findInput = new FindInput(this.view.getHTMLElement(), this.contextViewProvider, false, { label: 'what' });
-		this.findInput.value = findInput;
+		const widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider);
+		this.widget.value = widget;
 
-		findInput.onDidChange(this.onDidChangeValue, this, this.enabledDisposables);
+		widget.onDidChangeValue(this.onDidChangeValue, this, this.enabledDisposables);
 	}
 
-	// private disable(): void {
-	// 	if (!this.enabled) {
-	// 		return;
-	// 	}
+	private disable(): void {
+		if (!this.enabled) {
+			return;
+		}
 
-	// 	this.findInput.value = undefined;
-	// }
+		this.widget.value = undefined;
+	}
 
 	// private onEventOrInput(e: MouseEvent | StandardKeyboardEvent | string): void {
 	// 	if (typeof e === 'string') {
@@ -821,8 +872,8 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 		return !FuzzyScore.isDefault(node.filterData as any as FuzzyScore);
 	}
 
-	style(styles: IFindInputStyles): void {
-		this.findInput.value?.style(styles);
+	style(styles: ITypeFilterWidgetStyles): void {
+		this.widget.value?.style(styles);
 	}
 
 	dispose() {

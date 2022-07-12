@@ -85,8 +85,29 @@
 	display: none;
 }
 
-.monaco-list > .monaco-findInput {
+.monaco-tree-type-filter {
 	position: absolute;
 	top: 0;
-	right: 0;
+	right: 4px;
+	display: flex;
+	padding: 3px;
+}
+
+.monaco-tree-type-filter-grab {
+	display: flex !important;
+	align-items: center;
+	justify-content: center;
+}
+
+.monaco-tree-type-filter-actionbar {
+	margin-left: 4px;
+}
+
+.monaco-tree-type-filter-actionbar .monaco-action-bar .action-label {
+	padding: 2px;
+}
+
+.monaco-tree-type-filter-input .monaco-inputbox > .ibwrapper > .input,
+.monaco-tree-type-filter-input .monaco-inputbox > .ibwrapper > .mirror {
+	padding: 2px;
 }
