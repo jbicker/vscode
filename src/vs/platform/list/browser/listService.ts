@@ -114,7 +114,7 @@ export class ListService implements IListService {
 	}
 }
 
-const RawWorkbenchListFocusContextKey = new RawContextKey<boolean>('listFocus', true);
+export const RawWorkbenchListFocusContextKey = new RawContextKey<boolean>('listFocus', true);
 export const WorkbenchListSupportsMultiSelectContextKey = new RawContextKey<boolean>('listSupportsMultiselect', true);
 export const WorkbenchListFocusContextKey = ContextKeyExpr.and(RawWorkbenchListFocusContextKey, ContextKeyExpr.not(InputFocusedContextKey));
 export const WorkbenchListHasSelectionOrFocus = new RawContextKey<boolean>('listHasSelectionOrFocus', false);

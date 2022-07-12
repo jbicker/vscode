@@ -802,24 +802,13 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 			return;
 		}
 
-		this.widget.disable();
+		const widget = this.widget;
 		this.widget = undefined;
+		widget.disable().finally(() => widget.dispose());
 
 		this.onDidChangeValue('');
 		this.tree.domFocus();
 	}
-
-	// private onEventOrInput(e: MouseEvent | StandardKeyboardEvent | string): void {
-	// 	if (typeof e === 'string') {
-	// 		this.onInput(e);
-	// 	} else if (e instanceof MouseEvent || e.keyCode === KeyCode.Escape || (e.keyCode === KeyCode.Backspace && (isMacintosh ? e.altKey : e.ctrlKey))) {
-	// 		this.onInput('');
-	// 	} else if (e.keyCode === KeyCode.Backspace) {
-	// 		this.onInput(this.pattern.length === 0 ? '' : this.pattern.substr(0, this.pattern.length - 1));
-	// 	} else {
-	// 		this.onInput(this.pattern + e.browserEvent.key);
-	// 	}
-	// }
 
 	private onDidChangeValue(pattern: string): void {
 		this._pattern = pattern;
