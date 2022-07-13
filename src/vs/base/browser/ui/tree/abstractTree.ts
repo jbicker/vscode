@@ -29,6 +29,7 @@ import { Disposable, DisposableStore, dispose, IDisposable, toDisposable } from 
 import { clamp } from 'vs/base/common/numbers';
 import { ScrollEvent } from 'vs/base/common/scrollable';
 import { ISpliceable } from 'vs/base/common/sequence';
+import { isNumber } from 'vs/base/common/types';
 import 'vs/css!./media/tree';
 import { localize } from 'vs/nls';
 
@@ -695,6 +696,8 @@ class TypeFilterWidget extends Disposable {
 	private readonly filterToggle: FilterToggle;
 	private readonly findInput: FindInput;
 	private readonly actionbar: ActionBar;
+	private width = 0;
+	private right = 4;
 
 	readonly onDidChangeValue: Event<string>;
 	readonly onDidChangeMode: Event<TypeFilterMode>;
@@ -732,6 +735,32 @@ class TypeFilterWidget extends Disposable {
 		const closeAction = this._register(new Action('close', localize('close', "Close"), 'codicon codicon-close', true, () => disable()));
 		this.actionbar.push(closeAction, { icon: true, label: false });
 
+		const onGrabMouseDown = this._register(new DomEmitter(this.elements.grab, 'mousedown'));
+
+		this._register(onGrabMouseDown.event(e => {
+			const disposables = new DisposableStore();
+			const onWindowMouseMove = disposables.add(new DomEmitter(window, 'mousemove'));
+			const onWindowMouseUp = disposables.add(new DomEmitter(window, 'mouseup'));
+
+			const startRight = this.right;
+			const startX = e.pageX;
+			this.elements.grab.classList.add('grabbing');
+
+			const update = (e: MouseEvent) => {
+				const deltaX = e.pageX - startX;
+				this.right = startRight - deltaX;
+				this.layout();
+			};
+
+			disposables.add(onWindowMouseMove.event(update));
+			disposables.add(onWindowMouseUp.event(e => {
+				update(e);
+				this.elements.grab.classList.remove('grabbing');
+				disposables.dispose();
+			}));
+		}));
+
+
 		this.onDidChangeValue = this.findInput.onDidChange;
 		this.style(options ?? {});
 	}
@@ -750,6 +779,12 @@ class TypeFilterWidget extends Disposable {
 
 	focus() {
 		this.findInput.focus();
+	}
+
+	layout(width: number = this.width): void {
+		this.width = width;
+		this.right = Math.min(Math.max(4, this.right), Math.max(4, width - 160));
+		this.elements.root.style.right = `${this.right}px`;
 	}
 
 	async disable(): Promise<void> {
@@ -772,6 +807,7 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	private widget: TypeFilterWidget | undefined;
 	private styles: ITypeFilterWidgetStyles | undefined;
 	private mode: TypeFilterMode;
+	private width = 0;
 	// private messageDomNode: HTMLElement;
 
 	// private triggered = false;
@@ -830,8 +866,11 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 
 		this.widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider, this.mode, () => this.disable(), this.styles);
 		this.enabledDisposables.add(this.widget);
+
 		this.widget.onDidChangeValue(this.onDidChangeValue, this, this.enabledDisposables);
 		this.widget.onDidChangeMode(this.onDidChangeMode, this, this.enabledDisposables);
+
+		this.widget.layout(this.width);
 		this.widget.focus();
 	}
 
@@ -920,6 +959,11 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	style(styles: ITypeFilterWidgetStyles): void {
 		this.styles = styles;
 		this.widget?.style(styles);
+	}
+
+	layout(width: number): void {
+		this.width = width;
+		this.widget?.layout(width);
 	}
 
 	dispose() {
@@ -1507,6 +1551,10 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 
 	layout(height?: number, width?: number): void {
 		this.view.layout(height, width);
+
+		if (isNumber(width)) {
+			this.typeFilterController?.layout(width);
+		}
 	}
 
 	style(styles: IListStyles): void {

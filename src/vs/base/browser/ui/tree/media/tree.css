@@ -71,13 +71,11 @@
 .monaco-tree-type-filter {
 	position: absolute;
 	top: 0;
-	right: 4px;
 	display: flex;
 	padding: 3px;
 	transition: top 0.3s;
-	width: 200px;
-	min-width: 150px;
-	max-width: calc(100% - 20px);
+	width: 150px;
+	z-index: 100;
 }
 
 .monaco-tree-type-filter.disabled {
@@ -88,6 +86,11 @@
 	display: flex !important;
 	align-items: center;
 	justify-content: center;
+	cursor: grab;
+}
+
+.monaco-tree-type-filter-grab.grabbing {
+	cursor: grabbing;
 }
 
 .monaco-tree-type-filter-input {
