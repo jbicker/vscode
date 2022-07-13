@@ -658,7 +658,7 @@ export interface ICaseSensitiveToggleOpts {
 	readonly inputActiveOptionBackground?: Color;
 }
 
-export class CaseSensitiveToggle extends Toggle {
+export class FilterToggle extends Toggle {
 	constructor(opts?: ICaseSensitiveToggleOpts) {
 		super({
 			icon: Codicon.filter,
@@ -675,6 +675,11 @@ export interface ITypeFilterWidgetStyles extends IFindInputStyles, IListStyles {
 
 export interface ITypeFilterWidgetOpts extends ITypeFilterWidgetStyles { }
 
+enum TypeFilterMode {
+	Highlight,
+	Filter
+}
+
 class TypeFilterWidget extends Disposable {
 
 	private readonly elements = h('div.monaco-tree-type-filter', [
@@ -683,13 +688,21 @@ class TypeFilterWidget extends Disposable {
 		h('div.monaco-tree-type-filter-actionbar', { $: 'actionbar' }),
 	]);
 
+	set mode(mode: TypeFilterMode) {
+		this.filterToggle.checked = mode === TypeFilterMode.Filter;
+	}
+
+	private readonly filterToggle: FilterToggle;
 	private readonly findInput: FindInput;
 	private readonly actionbar: ActionBar;
+
 	readonly onDidChangeValue: Event<string>;
+	readonly onDidChangeMode: Event<TypeFilterMode>;
 
 	constructor(
 		container: HTMLElement,
 		contextViewProvider: IContextViewProvider,
+		mode: TypeFilterMode,
 		disable: () => void,
 		options?: ITypeFilterWidgetOpts
 	) {
@@ -698,12 +711,12 @@ class TypeFilterWidget extends Disposable {
 		container.appendChild(this.elements.root);
 		this._register(toDisposable(() => container.removeChild(this.elements.root)));
 
+		this.filterToggle = this._register(new FilterToggle({ ...options, isChecked: mode === TypeFilterMode.Filter }));
+		this.onDidChangeMode = Event.map(this.filterToggle.onChange, () => this.filterToggle.checked ? TypeFilterMode.Filter : TypeFilterMode.Highlight, this._store);
+
 		this.findInput = this._register(new FindInput(this.elements.findInput, contextViewProvider, false, {
 			label: 'todo',
-			additionalToggles: [new CaseSensitiveToggle({
-				...options,
-				isChecked: false // TODO
-			})]
+			additionalToggles: [this.filterToggle]
 		}));
 
 		this.actionbar = this._register(new ActionBar(this.elements.actionbar));
@@ -750,9 +763,6 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	private _pattern = '';
 	get pattern(): string { return this._pattern; }
 
-	private _filterOnType: boolean;
-	get filterOnType(): boolean { return this._filterOnType; }
-
 	private _empty: boolean = false;
 	get empty(): boolean { return this._empty; }
 
@@ -761,6 +771,7 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 
 	private widget: TypeFilterWidget | undefined;
 	private styles: ITypeFilterWidgetStyles | undefined;
+	private mode: TypeFilterMode;
 	// private messageDomNode: HTMLElement;
 
 	// private triggered = false;
@@ -780,10 +791,7 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	) {
 		// this.messageDomNode = append(view.getHTMLElement(), $(`.monaco-list-type-filter-message`));
 
-		this._filterOnType = !!tree.options.filterOnType;
-
-		// this.disposables.add(addDisposableListener(this.filterOnTypeDomNode, 'input', () => this.onDidChangeFilterOnType()));
-
+		this.mode = (tree.options.filterOnType ?? false) ? TypeFilterMode.Filter : TypeFilterMode.Highlight;
 		model.onDidSplice(this.onDidSpliceModel, this, this.disposables);
 		this.updateOptions(tree.options);
 	}
@@ -795,10 +803,13 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 		// 	this.enable();
 		// }
 
-		// if (typeof options.filterOnType !== 'undefined') {
-		// 	this._filterOnType = !!options.filterOnType;
-		// 	this.filterOnTypeDomNode.checked = this._filterOnType;
-		// }
+		if (typeof options.filterOnType !== 'undefined') {
+			this.mode = (options.filterOnType ?? false) ? TypeFilterMode.Filter : TypeFilterMode.Highlight;
+
+			if (this.widget) {
+				this.widget.mode = this.mode;
+			}
+		}
 
 		this.tree.refilter();
 		this.render();
@@ -817,9 +828,10 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 			return;
 		}
 
-		this.widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider, () => this.disable(), this.styles);
+		this.widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider, this.mode, () => this.disable(), this.styles);
 		this.enabledDisposables.add(this.widget);
 		this.widget.onDidChangeValue(this.onDidChangeValue, this, this.enabledDisposables);
+		this.widget.onDidChangeMode(this.onDidChangeMode, this, this.enabledDisposables);
 		this.widget.focus();
 	}
 
@@ -869,12 +881,11 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 		this.render();
 	}
 
-	// private onDidChangeFilterOnType(): void {
-	// 	this.tree.updateOptions({ filterOnType: this.filterOnTypeDomNode.checked });
-	// 	this.tree.refilter();
-	// 	this.tree.domFocus();
-	// 	this.render();
-	// }
+	private onDidChangeMode(mode: TypeFilterMode): void {
+		this.tree.updateOptions({ filterOnType: mode === TypeFilterMode.Filter });
+		this.tree.refilter();
+		this.render();
+	}
 
 	private render(): void {
 		// const noMatches = this.filter.totalCount > 0 && this.filter.matchCount === 0;
@@ -895,7 +906,7 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	}
 
 	shouldAllowFocus(node: ITreeNode<T, TFilterData>): boolean {
-		if (!this.widget || !this.pattern || this.filterOnType) {
+		if (!this.widget || !this.pattern || this.mode === TypeFilterMode.Filter) {
 			return true;
 		}
 
@@ -1422,10 +1433,6 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 	}
 
 	get contentHeight(): number {
-		if (this.typeFilterController && this.typeFilterController.filterOnType && this.typeFilterController.empty) {
-			return 100;
-		}
-
 		return this.view.contentHeight;
 	}
 
