@@ -10,6 +10,7 @@ import { StandardKeyboardEvent } from 'vs/base/browser/keyboardEvent';
 import { ActionBar } from 'vs/base/browser/ui/actionbar/actionbar';
 import { IContextViewProvider } from 'vs/base/browser/ui/contextview/contextview';
 import { FindInput, IFindInputStyles } from 'vs/base/browser/ui/findinput/findInput';
+import { IMessage, MessageType } from 'vs/base/browser/ui/inputbox/inputBox';
 import { IIdentityProvider, IKeyboardNavigationLabelProvider, IListContextMenuEvent, IListDragAndDrop, IListDragOverReaction, IListMouseEvent, IListRenderer, IListVirtualDelegate } from 'vs/base/browser/ui/list/list';
 import { ElementsDragAndDropData } from 'vs/base/browser/ui/list/listView';
 import { IListOptions, IListStyles, isButton, isInputElement, isMonacoEditor, List, MouseController } from 'vs/base/browser/ui/list/listWidget';
@@ -783,8 +784,16 @@ class TypeFilterWidget extends Disposable {
 
 	layout(width: number = this.width): void {
 		this.width = width;
-		this.right = Math.min(Math.max(4, this.right), Math.max(4, width - 160));
+		this.right = Math.min(Math.max(4, this.right), Math.max(4, width - 170));
 		this.elements.root.style.right = `${this.right}px`;
+	}
+
+	showMessage(message: IMessage): void {
+		this.findInput.showMessage(message);
+	}
+
+	clearMessage(): void {
+		this.findInput.clearMessage();
 	}
 
 	async disable(): Promise<void> {
@@ -798,19 +807,10 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	private _pattern = '';
 	get pattern(): string { return this._pattern; }
 
-	private _empty: boolean = false;
-	get empty(): boolean { return this._empty; }
-
-	private readonly _onDidChangeEmptyState = new Emitter<boolean>();
-	readonly onDidChangeEmptyState: Event<boolean> = Event.latch(this._onDidChangeEmptyState.event);
-
 	private widget: TypeFilterWidget | undefined;
 	private styles: ITypeFilterWidgetStyles | undefined;
 	private mode: TypeFilterMode;
 	private width = 0;
-	// private messageDomNode: HTMLElement;
-
-	// private triggered = false;
 
 	private readonly _onDidChangePattern = new Emitter<string>();
 	readonly onDidChangePattern = this._onDidChangePattern.event;
@@ -825,8 +825,6 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 		private filter: TypeFilter<T>,
 		private readonly contextViewProvider: IContextViewProvider
 	) {
-		// this.messageDomNode = append(view.getHTMLElement(), $(`.monaco-list-type-filter-message`));
-
 		this.mode = (tree.options.filterOnType ?? false) ? TypeFilterMode.Filter : TypeFilterMode.Highlight;
 		model.onDidSplice(this.onDidSpliceModel, this, this.disposables);
 		this.updateOptions(tree.options);
@@ -850,14 +848,6 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 		this.tree.refilter();
 		this.render();
 	}
-
-	// toggle(): void {
-	// 	this.triggered = !this.triggered;
-
-	// 	if (!this.triggered) {
-	// 		this.onEventOrInput('');
-	// 	}
-	// }
 
 	enable(): void {
 		if (this.widget) {
@@ -927,21 +917,13 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	}
 
 	private render(): void {
-		// const noMatches = this.filter.totalCount > 0 && this.filter.matchCount === 0;
+		const noMatches = this.filter.totalCount > 0 && this.filter.matchCount === 0;
 
-		// if (this.pattern && this.tree.options.filterOnType && noMatches) {
-		// 	this.messageDomNode.textContent = localize('empty', "No elements found");
-		// 	this._empty = true;
-		// } else {
-		// 	this.messageDomNode.innerText = '';
-		// 	this._empty = false;
-		// }
-
-		// this.domNode.classList.toggle('no-matches', noMatches);
-		// this.domNode.title = localize('found', "Matched {0} out of {1} elements", this.filter.matchCount, this.filter.totalCount);
-		// this.labelDomNode.textContent = this.pattern.length > 16 ? '…' + this.pattern.substr(this.pattern.length - 16) : this.pattern;
-
-		// this._onDidChangeEmptyState.fire(this._empty);
+		if (this.pattern && noMatches) {
+			this.widget?.showMessage({ type: MessageType.WARNING, content: localize('not found', "No elements found.") });
+		} else {
+			this.widget?.clearMessage();
+		}
 	}
 
 	shouldAllowFocus(node: ITreeNode<T, TFilterData>): boolean {
@@ -1483,13 +1465,7 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 	}
 
 	get onDidChangeContentHeight(): Event<number> {
-		let result = this.view.onDidChangeContentHeight;
-
-		if (this.typeFilterController) {
-			result = Event.any(result, Event.map(this.typeFilterController.onDidChangeEmptyState, () => this.contentHeight));
-		}
-
-		return result;
+		return this.view.onDidChangeContentHeight;
 	}
 
 	get scrollTop(): number {
