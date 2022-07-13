@@ -715,7 +715,7 @@ class TypeFilterWidget extends Disposable {
 		this.onDidChangeMode = Event.map(this.filterToggle.onChange, () => this.filterToggle.checked ? TypeFilterMode.Filter : TypeFilterMode.Highlight, this._store);
 
 		this.findInput = this._register(new FindInput(this.elements.findInput, contextViewProvider, false, {
-			label: 'todo',
+			label: localize('type to search', "Type to search"),
 			additionalToggles: [this.filterToggle]
 		}));
 
