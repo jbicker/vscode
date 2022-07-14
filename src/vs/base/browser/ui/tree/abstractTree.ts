@@ -682,7 +682,7 @@ enum TypeFilterMode {
 	Filter
 }
 
-class TypeFilterWidget extends Disposable {
+class TypeFilterWidget<T, TFilterData> extends Disposable {
 
 	private readonly elements = h('div.monaco-tree-type-filter', [
 		h('div.monaco-tree-type-filter-grab.codicon.codicon-debug-gripper', { $: 'grab' }),
@@ -707,6 +707,7 @@ class TypeFilterWidget extends Disposable {
 
 	constructor(
 		container: HTMLElement,
+		private tree: AbstractTree<T, TFilterData, any>,
 		contextViewProvider: IContextViewProvider,
 		mode: TypeFilterMode,
 		options?: ITypeFilterWidgetOpts
@@ -734,6 +735,11 @@ class TypeFilterWidget extends Disposable {
 		this._register(onKeyDown((e): any => {
 			switch (e.keyCode) {
 				case KeyCode.Escape: return this.dispose();
+				case KeyCode.DownArrow:
+					e.preventDefault();
+					e.stopPropagation();
+					this.tree.domFocus();
+					return;
 			}
 		}));
 
@@ -813,7 +819,7 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	private _pattern = '';
 	get pattern(): string { return this._pattern; }
 
-	private widget: TypeFilterWidget | undefined;
+	private widget: TypeFilterWidget<T, TFilterData> | undefined;
 	private styles: ITypeFilterWidgetStyles | undefined;
 	private mode: TypeFilterMode;
 	private width = 0;
@@ -860,7 +866,7 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 			return;
 		}
 
-		this.widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider, this.mode, this.styles);
+		this.widget = new TypeFilterWidget(this.view.getHTMLElement(), this.tree, this.contextViewProvider, this.mode, this.styles);
 		this.enabledDisposables.add(this.widget);
 
 		this.widget.onDidChangeValue(this.onDidChangeValue, this, this.enabledDisposables);
