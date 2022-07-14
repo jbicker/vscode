@@ -734,7 +734,6 @@ class TypeFilterWidget<T, TFilterData> extends Disposable {
 
 		this._register(onKeyDown((e): any => {
 			switch (e.keyCode) {
-				case KeyCode.Escape: return this.dispose();
 				case KeyCode.DownArrow:
 					e.preventDefault();
 					e.stopPropagation();
@@ -792,6 +791,10 @@ class TypeFilterWidget<T, TFilterData> extends Disposable {
 		this.findInput.focus();
 	}
 
+	select() {
+		this.findInput.select();
+	}
+
 	layout(width: number = this.width): void {
 		this.width = width;
 		this.right = Math.min(Math.max(4, this.right), Math.max(4, width - 170));
@@ -826,6 +829,9 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 
 	private readonly _onDidChangePattern = new Emitter<string>();
 	readonly onDidChangePattern = this._onDidChangePattern.event;
+
+	private readonly _onDidChangeEnablement = new Emitter<boolean>();
+	readonly onDidChangeEnablement = this._onDidChangeEnablement.event;
 
 	private enabledDisposables = new DisposableStore();
 	private readonly disposables = new DisposableStore();
@@ -863,6 +869,8 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 
 	enable(): void {
 		if (this.widget) {
+			this.widget.focus();
+			this.widget.select();
 			return;
 		}
 
@@ -875,6 +883,8 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 
 		this.widget.layout(this.width);
 		this.widget.focus();
+
+		this._onDidChangeEnablement.fire(true);
 	}
 
 	disable(): void {
@@ -889,6 +899,8 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 
 		this.onDidChangeValue('');
 		this.tree.domFocus();
+
+		this._onDidChangeEnablement.fire(false);
 	}
 
 	private onDidChangeValue(pattern: string): void {
@@ -1315,6 +1327,7 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 	private anchor: Trait<T>;
 	private eventBufferer = new EventBufferer();
 	private typeFilterController?: TypeFilterController<T, TFilterData>;
+	readonly onDidChangeTypeFilterEnablement: Event<boolean> = Event.None;
 	private focusNavigationFilter: ((node: ITreeNode<T, TFilterData>) => boolean) | undefined;
 	private styleElement: HTMLStyleElement;
 	protected readonly disposables = new DisposableStore();
@@ -1431,6 +1444,7 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 		if (_options.keyboardNavigationLabelProvider && _options.contextViewProvider) {
 			this.typeFilterController = new TypeFilterController(this, this.model, this.view, filter!, _options.contextViewProvider);
 			this.focusNavigationFilter = node => this.typeFilterController!.shouldAllowFocus(node);
+			this.onDidChangeTypeFilterEnablement = this.typeFilterController.onDidChangeEnablement;
 			this.disposables.add(this.typeFilterController!);
 		}
 
@@ -1622,6 +1636,10 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 
 	enableTypeFilter(): void {
 		this.typeFilterController?.enable();
+	}
+
+	disableTypeFilter(): void {
+		this.typeFilterController?.disable();
 	}
 
 	refilter(): void {

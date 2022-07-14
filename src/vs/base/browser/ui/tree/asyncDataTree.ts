@@ -341,6 +341,7 @@ export class AsyncDataTree<TInput, T, TFilterData = void> implements IDisposable
 
 	get onDidUpdateOptions(): Event<IAsyncDataTreeOptionsUpdate> { return this.tree.onDidUpdateOptions; }
 
+	get onDidChangeTypeFilterEnablement(): Event<boolean> { return this.tree.onDidChangeTypeFilterEnablement; }
 	get filterOnType(): boolean { return this.tree.filterOnType; }
 	get expandOnlyOnTwistieClick(): boolean | ((e: T) => boolean) {
 		if (typeof this.tree.expandOnlyOnTwistieClick === 'boolean') {
@@ -622,6 +623,10 @@ export class AsyncDataTree<TInput, T, TFilterData = void> implements IDisposable
 
 	enableTypeFilter(): void {
 		this.tree.enableTypeFilter();
+	}
+
+	disableTypeFilter(): void {
+		this.tree.disableTypeFilter();
 	}
 
 	refilter(): void {
