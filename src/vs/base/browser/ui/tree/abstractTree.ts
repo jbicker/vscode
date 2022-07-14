@@ -700,6 +700,8 @@ class TypeFilterWidget extends Disposable {
 	private width = 0;
 	private right = 4;
 
+	readonly _onDidDisable = new Emitter<void>();
+	readonly onDidDisable = this._onDidDisable.event;
 	readonly onDidChangeValue: Event<string>;
 	readonly onDidChangeMode: Event<TypeFilterMode>;
 
@@ -707,7 +709,6 @@ class TypeFilterWidget extends Disposable {
 		container: HTMLElement,
 		contextViewProvider: IContextViewProvider,
 		mode: TypeFilterMode,
-		disable: () => void,
 		options?: ITypeFilterWidgetOpts
 	) {
 		super();
@@ -726,14 +727,17 @@ class TypeFilterWidget extends Disposable {
 		this.actionbar = this._register(new ActionBar(this.elements.actionbar));
 
 		const emitter = this._register(new DomEmitter(this.findInput.inputBox.inputElement, 'keydown'));
-		const onEscape = this._register(Event.chain(emitter.event))
+		const onKeyDown = this._register(Event.chain(emitter.event))
 			.map(e => new StandardKeyboardEvent(e))
-			.filter(e => e.keyCode === KeyCode.Escape)
 			.event;
 
-		this._register(onEscape(() => disable()));
+		this._register(onKeyDown((e): any => {
+			switch (e.keyCode) {
+				case KeyCode.Escape: return this.dispose();
+			}
+		}));
 
-		const closeAction = this._register(new Action('close', localize('close', "Close"), 'codicon codicon-close', true, () => disable()));
+		const closeAction = this._register(new Action('close', localize('close', "Close"), 'codicon codicon-close', true, () => this.dispose()));
 		this.actionbar.push(closeAction, { icon: true, label: false });
 
 		const onGrabMouseDown = this._register(new DomEmitter(this.elements.grab, 'mousedown'));
@@ -796,9 +800,11 @@ class TypeFilterWidget extends Disposable {
 		this.findInput.clearMessage();
 	}
 
-	async disable(): Promise<void> {
+	override async dispose(): Promise<void> {
+		this._onDidDisable.fire();
 		this.elements.root.classList.add('disabled');
 		await timeout(300);
+		super.dispose();
 	}
 }
 
@@ -815,7 +821,7 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 	private readonly _onDidChangePattern = new Emitter<string>();
 	readonly onDidChangePattern = this._onDidChangePattern.event;
 
-	private readonly enabledDisposables = new DisposableStore();
+	private enabledDisposables = new DisposableStore();
 	private readonly disposables = new DisposableStore();
 
 	constructor(
@@ -854,11 +860,12 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 			return;
 		}
 
-		this.widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider, this.mode, () => this.disable(), this.styles);
+		this.widget = new TypeFilterWidget(this.view.getHTMLElement(), this.contextViewProvider, this.mode, this.styles);
 		this.enabledDisposables.add(this.widget);
 
 		this.widget.onDidChangeValue(this.onDidChangeValue, this, this.enabledDisposables);
 		this.widget.onDidChangeMode(this.onDidChangeMode, this, this.enabledDisposables);
+		this.widget.onDidDisable(this.disable, this, this.enabledDisposables);
 
 		this.widget.layout(this.width);
 		this.widget.focus();
@@ -869,9 +876,10 @@ class TypeFilterController<T, TFilterData> implements IDisposable {
 			return;
 		}
 
-		const widget = this.widget;
 		this.widget = undefined;
-		widget.disable().finally(() => widget.dispose());
+
+		this.enabledDisposables.dispose();
+		this.enabledDisposables = new DisposableStore();
 
 		this.onDidChangeValue('');
 		this.tree.domFocus();
