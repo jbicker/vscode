@@ -341,7 +341,7 @@ export class OutlinePane extends ViewPane {
 
 		// feature: expand all nodes when filtering (not when finding)
 		let viewState: AbstractTreeViewState | undefined;
-		this._editorControlDisposables.add(tree.onDidChangeTypeFilterPattern(pattern => {
+		this._editorControlDisposables.add(tree.onDidChangeFindPattern(pattern => {
 			if (!tree.options.filterOnType) {
 				return;
 			}

@@ -585,7 +585,7 @@ export class LoadedScriptsView extends ViewPane {
 
 		// feature: expand all nodes when filtering (not when finding)
 		let viewState: IViewState | undefined;
-		this._register(this.tree.onDidChangeTypeFilterPattern(pattern => {
+		this._register(this.tree.onDidChangeFindPattern(pattern => {
 			if (!this.tree.options.filterOnType) {
 				return;
 			}

@@ -1181,7 +1181,7 @@ class WorkbenchTreeInternals<TInput, T, TFilterData> {
 			}),
 			tree.onDidChangeCollapseState(updateCollapseContextKeys),
 			tree.onDidChangeModel(updateCollapseContextKeys),
-			tree.onDidChangeTypeFilterEnablement(enabled => this.treeTypeFilterEnabled.set(enabled)),
+			tree.onDidChangeFindEnablement(enabled => this.treeTypeFilterEnabled.set(enabled)),
 			configurationService.onDidChangeConfiguration(e => {
 				let newOptions: IAbstractTreeOptionsUpdate = {};
 				if (e.affectsConfiguration(multiSelectModifierSettingKey)) {

@@ -649,7 +649,7 @@ KeybindingsRegistry.registerCommandAndKeybindingRule({
 		// Tree
 		else if (widget instanceof AbstractTree || widget instanceof AsyncDataTree) {
 			const tree = widget;
-			tree.enableTypeFilter();
+			tree.enableFind();
 		}
 	}
 });
@@ -664,7 +664,7 @@ KeybindingsRegistry.registerCommandAndKeybindingRule({
 
 		if (widget instanceof AbstractTree || widget instanceof AsyncDataTree) {
 			const tree = widget;
-			tree.disableTypeFilter();
+			tree.disableFind();
 		}
 	}
 });
