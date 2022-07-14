@@ -13,7 +13,6 @@ import { IResourceLabel, ResourceLabels } from 'vs/workbench/browser/labels';
 import { CommentNode, CommentsModel, ResourceWithCommentThreads } from 'vs/workbench/contrib/comments/common/commentModel';
 import { IAsyncDataSource, ITreeNode } from 'vs/base/browser/ui/tree/tree';
 import { IListVirtualDelegate, IListRenderer } from 'vs/base/browser/ui/list/list';
-import { IAccessibilityService } from 'vs/platform/accessibility/common/accessibility';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { IContextKeyService } from 'vs/platform/contextkey/common/contextkey';
 import { WorkbenchAsyncDataTree, IListService, IWorkbenchAsyncDataTreeOptions } from 'vs/platform/list/browser/listService';
@@ -253,7 +252,6 @@ export class CommentsList extends WorkbenchAsyncDataTree<any, any> {
 		@IThemeService themeService: IThemeService,
 		@IInstantiationService instantiationService: IInstantiationService,
 		@IConfigurationService configurationService: IConfigurationService,
-		@IAccessibilityService accessibilityService: IAccessibilityService
 	) {
 		const delegate = new CommentsModelVirualDelegate();
 		const dataSource = new CommentsAsyncDataSource();
@@ -301,8 +299,7 @@ export class CommentsList extends WorkbenchAsyncDataTree<any, any> {
 			contextKeyService,
 			listService,
 			themeService,
-			configurationService,
-			accessibilityService
+			configurationService
 		);
 	}
 }

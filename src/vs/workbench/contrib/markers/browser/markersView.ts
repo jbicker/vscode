@@ -40,7 +40,6 @@ import { IMarkerService, MarkerSeverity } from 'vs/platform/markers/common/marke
 import { withUndefinedAsNull } from 'vs/base/common/types';
 import { MementoObject, Memento } from 'vs/workbench/common/memento';
 import { IIdentityProvider, IListVirtualDelegate } from 'vs/base/browser/ui/list/list';
-import { IAccessibilityService } from 'vs/platform/accessibility/common/accessibility';
 import { KeyCode } from 'vs/base/common/keyCodes';
 import { editorLightBulbForeground, editorLightBulbAutoFixForeground } from 'vs/platform/theme/common/colorRegistry';
 import { ViewPane, IViewPaneOptions } from 'vs/workbench/browser/parts/views/viewPane';
@@ -927,9 +926,8 @@ class MarkersTree extends WorkbenchObjectTree<MarkerElement, FilterData> impleme
 		@IListService listService: IListService,
 		@IThemeService themeService: IThemeService,
 		@IConfigurationService configurationService: IConfigurationService,
-		@IAccessibilityService accessibilityService: IAccessibilityService
 	) {
-		super(user, container, delegate, renderers, options, instantiationService, contextKeyService, listService, themeService, configurationService, accessibilityService);
+		super(user, container, delegate, renderers, options, instantiationService, contextKeyService, listService, themeService, configurationService);
 		this.visibilityContextKey = MarkersContextKeys.MarkersTreeVisibilityContextKey.bindTo(contextKeyService);
 	}
 

@@ -14,7 +14,6 @@ import { IListService, WorkbenchAsyncDataTree } from 'vs/platform/list/browser/l
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { IContextKeyService } from 'vs/platform/contextkey/common/contextkey';
 import { IThemeService, registerThemingParticipant, IColorTheme, ICssStyleCollector } from 'vs/platform/theme/common/themeService';
-import { IAccessibilityService } from 'vs/platform/accessibility/common/accessibility';
 import { IAsyncDataSource, ITreeNode } from 'vs/base/browser/ui/tree/tree';
 import { IListVirtualDelegate, IListRenderer } from 'vs/base/browser/ui/list/list';
 import { CancellationToken } from 'vs/base/common/cancellation';
@@ -243,7 +242,6 @@ export class ExtensionsTree extends WorkbenchAsyncDataTree<IExtensionData, IExte
 		@IThemeService themeService: IThemeService,
 		@IInstantiationService instantiationService: IInstantiationService,
 		@IConfigurationService configurationService: IConfigurationService,
-		@IAccessibilityService accessibilityService: IAccessibilityService,
 		@IExtensionsWorkbenchService extensionsWorkdbenchService: IExtensionsWorkbenchService
 	) {
 		const delegate = new VirualDelegate();
@@ -276,7 +274,7 @@ export class ExtensionsTree extends WorkbenchAsyncDataTree<IExtensionData, IExte
 					}
 				}
 			},
-			instantiationService, contextKeyService, listService, themeService, configurationService, accessibilityService
+			instantiationService, contextKeyService, listService, themeService, configurationService
 		);
 
 		this.setInput(input);

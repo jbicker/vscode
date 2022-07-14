@@ -13,7 +13,7 @@ import { FindInput, IFindInputStyles } from 'vs/base/browser/ui/findinput/findIn
 import { IMessage, MessageType } from 'vs/base/browser/ui/inputbox/inputBox';
 import { IIdentityProvider, IKeyboardNavigationLabelProvider, IListContextMenuEvent, IListDragAndDrop, IListDragOverReaction, IListMouseEvent, IListRenderer, IListVirtualDelegate } from 'vs/base/browser/ui/list/list';
 import { ElementsDragAndDropData } from 'vs/base/browser/ui/list/listView';
-import { IListOptions, IListStyles, isButton, isInputElement, isMonacoEditor, List, MouseController } from 'vs/base/browser/ui/list/listWidget';
+import { IListOptions, IListStyles, isButton, isInputElement, isMonacoEditor, List, MouseController, TypeNavigationMode } from 'vs/base/browser/ui/list/listWidget';
 import { Toggle } from 'vs/base/browser/ui/toggle/toggle';
 import { getVisibleState, isFilterResult } from 'vs/base/browser/ui/tree/indexTreeModel';
 import { ICollapseStateChangeEvent, ITreeContextMenuEvent, ITreeDragAndDrop, ITreeEvent, ITreeFilter, ITreeModel, ITreeModelSpliceEvent, ITreeMouseEvent, ITreeNavigator, ITreeNode, ITreeRenderer, TreeDragOverBubble, TreeError, TreeFilterResult, TreeMouseEventTarget, TreeVisibility } from 'vs/base/browser/ui/tree/tree';
@@ -636,7 +636,7 @@ class FindFilter<T> implements ITreeFilter<T, FuzzyScore | LabelFuzzyScore>, IDi
 			}
 		}
 
-		if (this.tree.options.filterOnType) {
+		if (this.tree.findMode === TreeFindMode.Filter) {
 			return TreeVisibility.Recurse;
 		} else {
 			return { data: FuzzyScore.Default, visibility: true };
@@ -677,7 +677,7 @@ export interface IFindWidgetStyles extends IFindInputStyles, IListStyles { }
 
 export interface IFindWidgetOpts extends IFindWidgetStyles { }
 
-enum FindMode {
+export enum TreeFindMode {
 	Highlight,
 	Filter
 }
@@ -690,8 +690,8 @@ class FindWidget<T, TFilterData> extends Disposable {
 		h('div.monaco-tree-type-filter-actionbar', { $: 'actionbar' }),
 	]);
 
-	set mode(mode: FindMode) {
-		this.modeToggle.checked = mode === FindMode.Filter;
+	set mode(mode: TreeFindMode) {
+		this.modeToggle.checked = mode === TreeFindMode.Filter;
 	}
 
 	private readonly modeToggle: ModeToggle;
@@ -703,13 +703,13 @@ class FindWidget<T, TFilterData> extends Disposable {
 	readonly _onDidDisable = new Emitter<void>();
 	readonly onDidDisable = this._onDidDisable.event;
 	readonly onDidChangeValue: Event<string>;
-	readonly onDidChangeMode: Event<FindMode>;
+	readonly onDidChangeMode: Event<TreeFindMode>;
 
 	constructor(
 		container: HTMLElement,
 		private tree: AbstractTree<T, TFilterData, any>,
 		contextViewProvider: IContextViewProvider,
-		mode: FindMode,
+		mode: TreeFindMode,
 		options?: IFindWidgetOpts
 	) {
 		super();
@@ -717,8 +717,8 @@ class FindWidget<T, TFilterData> extends Disposable {
 		container.appendChild(this.elements.root);
 		this._register(toDisposable(() => container.removeChild(this.elements.root)));
 
-		this.modeToggle = this._register(new ModeToggle({ ...options, isChecked: mode === FindMode.Filter }));
-		this.onDidChangeMode = Event.map(this.modeToggle.onChange, () => this.modeToggle.checked ? FindMode.Filter : FindMode.Highlight, this._store);
+		this.modeToggle = this._register(new ModeToggle({ ...options, isChecked: mode === TreeFindMode.Filter }));
+		this.onDidChangeMode = Event.map(this.modeToggle.onChange, () => this.modeToggle.checked ? TreeFindMode.Filter : TreeFindMode.Highlight, this._store);
 
 		this.findInput = this._register(new FindInput(this.elements.findInput, contextViewProvider, false, {
 			label: localize('type to search', "Type to search"),
@@ -822,10 +822,30 @@ class FindController<T, TFilterData> implements IDisposable {
 	private _pattern = '';
 	get pattern(): string { return this._pattern; }
 
+	private _mode: TreeFindMode;
+	get mode(): TreeFindMode { return this._mode; }
+	set mode(mode: TreeFindMode) {
+		if (mode === this._mode) {
+			return;
+		}
+
+		this._mode = mode;
+
+		if (this.widget) {
+			this.widget.mode = this._mode;
+		}
+
+		this.tree.refilter();
+		this.render();
+		this._onDidChangeMode.fire(mode);
+	}
+
 	private widget: FindWidget<T, TFilterData> | undefined;
 	private styles: IFindWidgetStyles | undefined;
-	private mode: FindMode;
 	private width = 0;
+
+	private readonly _onDidChangeMode = new Emitter<TreeFindMode>();
+	readonly onDidChangeMode = this._onDidChangeMode.event;
 
 	private readonly _onDidChangePattern = new Emitter<string>();
 	readonly onDidChangePattern = this._onDidChangePattern.event;
@@ -843,28 +863,8 @@ class FindController<T, TFilterData> implements IDisposable {
 		private filter: FindFilter<T>,
 		private readonly contextViewProvider: IContextViewProvider
 	) {
-		this.mode = (tree.options.filterOnType ?? false) ? FindMode.Filter : FindMode.Highlight;
+		this._mode = tree.options.defaultFindMode ?? TreeFindMode.Highlight;
 		model.onDidSplice(this.onDidSpliceModel, this, this.disposables);
-		this.updateOptions(tree.options);
-	}
-
-	updateOptions(options: IAbstractTreeOptions<T, TFilterData>): void {
-		// if (options.simpleKeyboardNavigation) {
-		// 	this.disable();
-		// } else {
-		// 	this.enable();
-		// }
-
-		if (typeof options.filterOnType !== 'undefined') {
-			this.mode = (options.filterOnType ?? false) ? FindMode.Filter : FindMode.Highlight;
-
-			if (this.widget) {
-				this.widget.mode = this.mode;
-			}
-		}
-
-		this.tree.refilter();
-		this.render();
 	}
 
 	open(): void {
@@ -874,11 +874,12 @@ class FindController<T, TFilterData> implements IDisposable {
 			return;
 		}
 
-		this.widget = new FindWidget(this.view.getHTMLElement(), this.tree, this.contextViewProvider, this.mode, this.styles);
+		this._mode = this.tree.options.defaultFindMode ?? TreeFindMode.Highlight;
+		this.widget = new FindWidget(this.view.getHTMLElement(), this.tree, this.contextViewProvider, this._mode, this.styles);
 		this.enabledDisposables.add(this.widget);
 
 		this.widget.onDidChangeValue(this.onDidChangeValue, this, this.enabledDisposables);
-		this.widget.onDidChangeMode(this.onDidChangeMode, this, this.enabledDisposables);
+		this.widget.onDidChangeMode(mode => this.mode = mode, undefined, this.enabledDisposables);
 		this.widget.onDidDisable(this.close, this, this.enabledDisposables);
 
 		this.widget.layout(this.width);
@@ -936,12 +937,6 @@ class FindController<T, TFilterData> implements IDisposable {
 		this.render();
 	}
 
-	private onDidChangeMode(mode: FindMode): void {
-		this.tree.updateOptions({ filterOnType: mode === FindMode.Filter });
-		this.tree.refilter();
-		this.render();
-	}
-
 	private render(): void {
 		const noMatches = this.filter.totalCount > 0 && this.filter.matchCount === 0;
 
@@ -953,7 +948,7 @@ class FindController<T, TFilterData> implements IDisposable {
 	}
 
 	shouldAllowFocus(node: ITreeNode<T, TFilterData>): boolean {
-		if (!this.widget || !this.pattern || this.mode === FindMode.Filter) {
+		if (!this.widget || !this.pattern || this._mode === TreeFindMode.Filter) {
 			return true;
 		}
 
@@ -1013,8 +1008,9 @@ export interface IKeyboardNavigationEventFilter {
 
 export interface IAbstractTreeOptionsUpdate extends ITreeRendererOptions {
 	readonly multipleSelectionSupport?: boolean;
-	readonly automaticKeyboardNavigation?: boolean;
-	readonly filterOnType?: boolean;
+	readonly typeNavigationEnabled?: boolean;
+	readonly typeNavigationMode?: TypeNavigationMode;
+	readonly defaultFindMode?: TreeFindMode;
 	readonly smoothScrolling?: boolean;
 	readonly horizontalScrolling?: boolean;
 	readonly mouseWheelScrollSensitivity?: number;
@@ -1357,7 +1353,10 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 	private readonly _onWillRefilter = new Emitter<void>();
 	readonly onWillRefilter: Event<void> = this._onWillRefilter.event;
 
-	get filterOnType(): boolean { return !!this._options.filterOnType; }
+	get findMode(): TreeFindMode { return this.findController?.mode ?? TreeFindMode.Highlight; }
+	set findMode(findMode: TreeFindMode) { if (this.findController) { this.findController.mode = findMode; } }
+	readonly onDidChangeFindMode: Event<TreeFindMode>;
+
 	get onDidChangeFindPattern(): Event<string> { return this.findController ? this.findController.onDidChangePattern : Event.None; }
 
 	get expandOnDoubleClick(): boolean { return typeof this._options.expandOnDoubleClick === 'undefined' ? true : this._options.expandOnDoubleClick; }
@@ -1446,6 +1445,9 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 			this.focusNavigationFilter = node => this.findController!.shouldAllowFocus(node);
 			this.onDidChangeFindOpenState = this.findController.onDidChangeOpenState;
 			this.disposables.add(this.findController!);
+			this.onDidChangeFindMode = this.findController.onDidChangeMode;
+		} else {
+			this.onDidChangeFindMode = Event.None;
 		}
 
 		this.styleElement = createStyleSheet(this.view.getHTMLElement());
@@ -1460,9 +1462,6 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 		}
 
 		this.view.updateOptions(this._options);
-
-		this.findController?.updateOptions(this._options);
-
 		this._onDidUpdateOptions.fire(this._options);
 
 		this.getHTMLElement().classList.toggle('always', this._options.renderIndentGuides === RenderIndentGuides.Always);
@@ -1626,12 +1625,8 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 		return this.model.isCollapsed(location);
 	}
 
-	toggleKeyboardNavigation(): void {
-		this.view.toggleKeyboardNavigation();
-
-		// if (this.typeFilterController) {
-		// 	this.typeFilterController.toggle();
-		// }
+	triggerTypeNavigation(): void {
+		this.view.triggerTypeNavigation();
 	}
 
 	openFind(): void {

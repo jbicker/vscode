@@ -7,10 +7,10 @@ import { createStyleSheet } from 'vs/base/browser/dom';
 import { IContextViewProvider } from 'vs/base/browser/ui/contextview/contextview';
 import { IListMouseEvent, IListRenderer, IListTouchEvent, IListVirtualDelegate } from 'vs/base/browser/ui/list/list';
 import { IPagedListOptions, IPagedRenderer, PagedList } from 'vs/base/browser/ui/list/listPaging';
-import { DefaultStyleController, IListAccessibilityProvider, IListOptions, IListOptionsUpdate, IMultipleSelectionController, isSelectionRangeChangeEvent, isSelectionSingleChangeEvent, List } from 'vs/base/browser/ui/list/listWidget';
+import { DefaultStyleController, IListAccessibilityProvider, IListOptions, IListOptionsUpdate, IMultipleSelectionController, isSelectionRangeChangeEvent, isSelectionSingleChangeEvent, List, TypeNavigationMode } from 'vs/base/browser/ui/list/listWidget';
 import { ITableColumn, ITableRenderer, ITableVirtualDelegate } from 'vs/base/browser/ui/table/table';
 import { ITableOptions, ITableOptionsUpdate, Table } from 'vs/base/browser/ui/table/tableWidget';
-import { IAbstractTreeOptions, IAbstractTreeOptionsUpdate, IKeyboardNavigationEventFilter, RenderIndentGuides } from 'vs/base/browser/ui/tree/abstractTree';
+import { TreeFindMode, IAbstractTreeOptions, IAbstractTreeOptionsUpdate, IKeyboardNavigationEventFilter, RenderIndentGuides } from 'vs/base/browser/ui/tree/abstractTree';
 import { AsyncDataTree, CompressibleAsyncDataTree, IAsyncDataTreeOptions, IAsyncDataTreeOptionsUpdate, ICompressibleAsyncDataTreeOptions, ICompressibleAsyncDataTreeOptionsUpdate, ITreeCompressionDelegate } from 'vs/base/browser/ui/tree/asyncDataTree';
 import { DataTree, IDataTreeOptions } from 'vs/base/browser/ui/tree/dataTree';
 import { CompressibleObjectTree, ICompressibleObjectTreeOptions, ICompressibleObjectTreeOptionsUpdate, ICompressibleTreeRenderer, IObjectTreeOptions, ObjectTree } from 'vs/base/browser/ui/tree/objectTree';
@@ -18,7 +18,6 @@ import { IAsyncDataSource, IDataSource, ITreeEvent, ITreeRenderer } from 'vs/bas
 import { Emitter, Event } from 'vs/base/common/event';
 import { combinedDisposable, Disposable, DisposableStore, dispose, IDisposable, toDisposable } from 'vs/base/common/lifecycle';
 import { localize } from 'vs/nls';
-import { IAccessibilityService } from 'vs/platform/accessibility/common/accessibility';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { Extensions as ConfigurationExtensions, IConfigurationRegistry } from 'vs/platform/configuration/common/configurationRegistry';
 import { ContextKeyExpr, IContextKey, IContextKeyService, RawContextKey } from 'vs/platform/contextkey/common/contextkey';
@@ -126,7 +125,12 @@ export const WorkbenchTreeElementHasParent = new RawContextKey<boolean>('treeEle
 export const WorkbenchTreeElementCanExpand = new RawContextKey<boolean>('treeElementCanExpand', false);
 export const WorkbenchTreeElementHasChild = new RawContextKey<boolean>('treeElementHasChild', false);
 export const WorkbenchTreeFindOpen = new RawContextKey<boolean>('treeFindOpen', false);
-export const WorkbenchListAutomaticKeyboardNavigationKey = 'listAutomaticKeyboardNavigation';
+export const WorkbenchListTypeNavigationModeKey = 'listTypeNavigationMode';
+
+/**
+ * @deprecated in favor of WorkbenchListTypeNavigationModeKey
+ */
+export const WorkbenchListAutomaticKeyboardNavigationLegacyKey = 'listAutomaticKeyboardNavigation';
 
 function createScopedContextKeyService(contextKeyService: IContextKeyService, widget: ListWidget): IContextKeyService {
 	const result = contextKeyService.createScoped(widget.getHTMLElement());
@@ -137,6 +141,8 @@ function createScopedContextKeyService(contextKeyService: IContextKeyService, wi
 const multiSelectModifierSettingKey = 'workbench.list.multiSelectModifier';
 const openModeSettingKey = 'workbench.list.openMode';
 const horizontalScrollingKey = 'workbench.list.horizontalScrolling';
+const defaultFindModeSettingKey = 'workbench.list.defaultFindMode';
+/** @deprecated in favor of workbench.list.defaultFindMode */
 const keyboardNavigationSettingKey = 'workbench.list.keyboardNavigation';
 const treeIndentKey = 'workbench.tree.indent';
 const treeRenderIndentGuidesKey = 'workbench.tree.renderIndentGuides';
@@ -846,13 +852,12 @@ export class WorkbenchObjectTree<T extends NonNullable<any>, TFilterData = void>
 		@IContextKeyService contextKeyService: IContextKeyService,
 		@IListService listService: IListService,
 		@IThemeService themeService: IThemeService,
-		@IConfigurationService configurationService: IConfigurationService,
-		@IAccessibilityService accessibilityService: IAccessibilityService
+		@IConfigurationService configurationService: IConfigurationService
 	) {
-		const { options: treeOptions, disposable } = instantiationService.invokeFunction(workbenchTreeDataPreamble, container, options as any);
+		const { options: treeOptions, getTypeNavigationMode, disposable } = instantiationService.invokeFunction(workbenchTreeDataPreamble, container, options as any);
 		super(user, container, delegate, renderers, treeOptions);
 		this.disposables.add(disposable);
-		this.internals = new WorkbenchTreeInternals(this, options, options.overrideStyles, contextKeyService, listService, themeService, configurationService, accessibilityService);
+		this.internals = new WorkbenchTreeInternals(this, options, getTypeNavigationMode, options.overrideStyles, contextKeyService, listService, themeService, configurationService);
 		this.disposables.add(this.internals);
 	}
 
@@ -888,13 +893,12 @@ export class WorkbenchCompressibleObjectTree<T extends NonNullable<any>, TFilter
 		@IContextKeyService contextKeyService: IContextKeyService,
 		@IListService listService: IListService,
 		@IThemeService themeService: IThemeService,
-		@IConfigurationService configurationService: IConfigurationService,
-		@IAccessibilityService accessibilityService: IAccessibilityService
+		@IConfigurationService configurationService: IConfigurationService
 	) {
-		const { options: treeOptions, disposable } = instantiationService.invokeFunction(workbenchTreeDataPreamble, container, options as any);
+		const { options: treeOptions, getTypeNavigationMode, disposable } = instantiationService.invokeFunction(workbenchTreeDataPreamble, container, options as any);
 		super(user, container, delegate, renderers, treeOptions);
 		this.disposables.add(disposable);
-		this.internals = new WorkbenchTreeInternals(this, options, options.overrideStyles, contextKeyService, listService, themeService, configurationService, accessibilityService);
+		this.internals = new WorkbenchTreeInternals(this, options, getTypeNavigationMode, options.overrideStyles, contextKeyService, listService, themeService, configurationService);
 		this.disposables.add(this.internals);
 	}
 
@@ -936,13 +940,12 @@ export class WorkbenchDataTree<TInput, T, TFilterData = void> extends DataTree<T
 		@IContextKeyService contextKeyService: IContextKeyService,
 		@IListService listService: IListService,
 		@IThemeService themeService: IThemeService,
-		@IConfigurationService configurationService: IConfigurationService,
-		@IAccessibilityService accessibilityService: IAccessibilityService
+		@IConfigurationService configurationService: IConfigurationService
 	) {
-		const { options: treeOptions, disposable } = instantiationService.invokeFunction(workbenchTreeDataPreamble, container, options as any);
+		const { options: treeOptions, getTypeNavigationMode, disposable } = instantiationService.invokeFunction(workbenchTreeDataPreamble, container, options as any);
 		super(user, container, delegate, renderers, dataSource, treeOptions);
 		this.disposables.add(disposable);
-		this.internals = new WorkbenchTreeInternals(this, options, options.overrideStyles, contextKeyService, listService, themeService, configurationService, accessibilityService);
+		this.internals = new WorkbenchTreeInternals(this, options, getTypeNavigationMode, options.overrideStyles, contextKeyService, listService, themeService, configurationService);
 		this.disposables.add(this.internals);
 	}
 
@@ -984,13 +987,12 @@ export class WorkbenchAsyncDataTree<TInput, T, TFilterData = void> extends Async
 		@IContextKeyService contextKeyService: IContextKeyService,
 		@IListService listService: IListService,
 		@IThemeService themeService: IThemeService,
-		@IConfigurationService configurationService: IConfigurationService,
-		@IAccessibilityService accessibilityService: IAccessibilityService
+		@IConfigurationService configurationService: IConfigurationService
 	) {
-		const { options: treeOptions, disposable } = instantiationService.invokeFunction(workbenchTreeDataPreamble, container, options as any);
+		const { options: treeOptions, getTypeNavigationMode, disposable } = instantiationService.invokeFunction(workbenchTreeDataPreamble, container, options as any);
 		super(user, container, delegate, renderers, dataSource, treeOptions);
 		this.disposables.add(disposable);
-		this.internals = new WorkbenchTreeInternals(this, options, options.overrideStyles, contextKeyService, listService, themeService, configurationService, accessibilityService);
+		this.internals = new WorkbenchTreeInternals(this, options, getTypeNavigationMode, options.overrideStyles, contextKeyService, listService, themeService, configurationService);
 		this.disposables.add(this.internals);
 	}
 
@@ -1030,13 +1032,12 @@ export class WorkbenchCompressibleAsyncDataTree<TInput, T, TFilterData = void> e
 		@IContextKeyService contextKeyService: IContextKeyService,
 		@IListService listService: IListService,
 		@IThemeService themeService: IThemeService,
-		@IConfigurationService configurationService: IConfigurationService,
-		@IAccessibilityService accessibilityService: IAccessibilityService
+		@IConfigurationService configurationService: IConfigurationService
 	) {
-		const { options: treeOptions, disposable } = instantiationService.invokeFunction(workbenchTreeDataPreamble, container, options as any);
+		const { options: treeOptions, getTypeNavigationMode, disposable } = instantiationService.invokeFunction(workbenchTreeDataPreamble, container, options as any);
 		super(user, container, virtualDelegate, compressionDelegate, renderers, dataSource, treeOptions);
 		this.disposables.add(disposable);
-		this.internals = new WorkbenchTreeInternals(this, options, options.overrideStyles, contextKeyService, listService, themeService, configurationService, accessibilityService);
+		this.internals = new WorkbenchTreeInternals(this, options, getTypeNavigationMode, options.overrideStyles, contextKeyService, listService, themeService, configurationService);
 		this.disposables.add(this.internals);
 	}
 
@@ -1046,23 +1047,62 @@ export class WorkbenchCompressibleAsyncDataTree<TInput, T, TFilterData = void> e
 	}
 }
 
+function getDefaultTreeFindMode(configurationService: IConfigurationService) {
+	const value = configurationService.getValue<'highlight' | 'filter'>(defaultFindModeSettingKey);
+
+	if (value === 'highlight') {
+		return TreeFindMode.Highlight;
+	} else if (value === 'filter') {
+		return TreeFindMode.Filter;
+	}
+
+	const deprecatedValue = configurationService.getValue<'simple' | 'highlight' | 'filter'>(keyboardNavigationSettingKey);
+
+	if (deprecatedValue === 'simple' || deprecatedValue === 'highlight') {
+		return TreeFindMode.Highlight;
+	} else if (deprecatedValue === 'filter') {
+		return TreeFindMode.Filter;
+	}
+
+	return undefined;
+}
+
 function workbenchTreeDataPreamble<T, TFilterData, TOptions extends IAbstractTreeOptions<T, TFilterData> | IAsyncDataTreeOptions<T, TFilterData>>(
 	accessor: ServicesAccessor,
 	container: HTMLElement,
 	options: TOptions,
-): { options: TOptions; disposable: IDisposable } {
+): { options: TOptions; getTypeNavigationMode: () => TypeNavigationMode | undefined; disposable: IDisposable } {
 	const configurationService = accessor.get(IConfigurationService);
 	const keybindingService = accessor.get(IKeybindingService);
-	const accessibilityService = accessor.get(IAccessibilityService);
 	const contextViewService = accessor.get(IContextViewService);
+	const contextKeyService = accessor.get(IContextKeyService);
 
-	const accessibilityOn = accessibilityService.isScreenReaderOptimized();
-	const keyboardNavigation = accessibilityOn ? 'simple' : configurationService.getValue<string>(keyboardNavigationSettingKey);
+	const getTypeNavigationMode = () => {
+		// give priority to the context key value to disable this completely
+		const modeString = contextKeyService.getContextKeyValue<'automatic' | 'trigger'>(WorkbenchListTypeNavigationModeKey);
+
+		if (modeString === 'automatic') {
+			return TypeNavigationMode.Automatic;
+		} else if (modeString === 'trigger') {
+			return TypeNavigationMode.Trigger;
+		}
+
+		// try the deprecated one as well
+		const modeBoolean = Boolean(contextKeyService.getContextKeyValue(WorkbenchListAutomaticKeyboardNavigationLegacyKey));
+
+		if (!modeBoolean) {
+			return TypeNavigationMode.Trigger;
+		}
+
+		return undefined;
+	};
+
 	const horizontalScrolling = options.horizontalScrolling !== undefined ? options.horizontalScrolling : Boolean(configurationService.getValue(horizontalScrollingKey));
 	const [workbenchListOptions, disposable] = toWorkbenchListOptions(options, configurationService, keybindingService);
 	const additionalScrollHeight = options.additionalScrollHeight;
 
 	return {
+		getTypeNavigationMode,
 		disposable,
 		options: {
 			// ...options, // TODO@Joao why is this not splatted here?
@@ -1071,7 +1111,7 @@ function workbenchTreeDataPreamble<T, TFilterData, TOptions extends IAbstractTre
 			indent: typeof configurationService.getValue(treeIndentKey) === 'number' ? configurationService.getValue(treeIndentKey) : undefined,
 			renderIndentGuides: configurationService.getValue<RenderIndentGuides>(treeRenderIndentGuidesKey),
 			smoothScrolling: Boolean(configurationService.getValue(listSmoothScrolling)),
-			filterOnType: keyboardNavigation === 'filter',
+			defaultFindMode: getDefaultTreeFindMode(configurationService),
 			horizontalScrolling,
 			keyboardNavigationEventFilter: createKeyboardNavigationEventFilter(container, keybindingService),
 			additionalScrollHeight,
@@ -1108,12 +1148,12 @@ class WorkbenchTreeInternals<TInput, T, TFilterData> {
 	constructor(
 		private tree: WorkbenchObjectTree<T, TFilterData> | WorkbenchCompressibleObjectTree<T, TFilterData> | WorkbenchDataTree<TInput, T, TFilterData> | WorkbenchAsyncDataTree<TInput, T, TFilterData> | WorkbenchCompressibleAsyncDataTree<TInput, T, TFilterData>,
 		options: IWorkbenchObjectTreeOptions<T, TFilterData> | IWorkbenchCompressibleObjectTreeOptions<T, TFilterData> | IWorkbenchDataTreeOptions<T, TFilterData> | IWorkbenchAsyncDataTreeOptions<T, TFilterData> | IWorkbenchCompressibleAsyncDataTreeOptions<T, TFilterData>,
+		getTypeNavigationMode: () => TypeNavigationMode | undefined,
 		overrideStyles: IColorMapping | undefined,
 		@IContextKeyService contextKeyService: IContextKeyService,
 		@IListService listService: IListService,
 		@IThemeService private themeService: IThemeService,
-		@IConfigurationService configurationService: IConfigurationService,
-		@IAccessibilityService accessibilityService: IAccessibilityService,
+		@IConfigurationService configurationService: IConfigurationService
 	) {
 		this.contextKeyService = createScopedContextKeyService(contextKeyService, tree);
 
@@ -1135,14 +1175,6 @@ class WorkbenchTreeInternals<TInput, T, TFilterData> {
 
 		this._useAltAsMultipleSelectionModifier = useAltAsMultipleSelectionModifier(configurationService);
 
-		const updateKeyboardNavigation = () => {
-			const accessibilityOn = accessibilityService.isScreenReaderOptimized();
-			const keyboardNavigation = accessibilityOn ? 'simple' : configurationService.getValue<string>(keyboardNavigationSettingKey);
-			tree.updateOptions({
-				filterOnType: keyboardNavigation === 'filter'
-			});
-		};
-
 		this.updateStyleOverrides(overrideStyles);
 
 		const updateCollapseContextKeys = () => {
@@ -1158,6 +1190,10 @@ class WorkbenchTreeInternals<TInput, T, TFilterData> {
 			this.treeElementCanExpand.set(node.collapsible && node.collapsed);
 			this.treeElementHasChild.set(!!tree.getFirstElementChild(focus));
 		};
+
+		const interestingContextKeys = new Set();
+		interestingContextKeys.add(WorkbenchListTypeNavigationModeKey);
+		interestingContextKeys.add(WorkbenchListAutomaticKeyboardNavigationLegacyKey);
 
 		this.disposables.push(
 			this.contextKeyService,
@@ -1199,8 +1235,8 @@ class WorkbenchTreeInternals<TInput, T, TFilterData> {
 					const smoothScrolling = Boolean(configurationService.getValue(listSmoothScrolling));
 					newOptions = { ...newOptions, smoothScrolling };
 				}
-				if (e.affectsConfiguration(keyboardNavigationSettingKey)) {
-					updateKeyboardNavigation();
+				if (e.affectsConfiguration(defaultFindModeSettingKey) || e.affectsConfiguration(keyboardNavigationSettingKey)) {
+					tree.updateOptions({ defaultFindMode: getDefaultTreeFindMode(configurationService) });
 				}
 				if (e.affectsConfiguration(horizontalScrollingKey) && options.horizontalScrolling === undefined) {
 					const horizontalScrolling = Boolean(configurationService.getValue(horizontalScrollingKey));
@@ -1221,7 +1257,11 @@ class WorkbenchTreeInternals<TInput, T, TFilterData> {
 					tree.updateOptions(newOptions);
 				}
 			}),
-			accessibilityService.onDidChangeScreenReaderOptimized(() => updateKeyboardNavigation())
+			this.contextKeyService.onDidChangeContext(e => {
+				if (e.affectsSome(interestingContextKeys)) {
+					tree.updateOptions({ typeNavigationMode: getTypeNavigationMode() });
+				}
+			})
 		);
 
 		this.navigator = new TreeResourceNavigator(tree, { configurationService, ...options });
@@ -1316,6 +1356,16 @@ configurationRegistry.registerConfiguration({
 			default: 5,
 			description: localize('Fast Scroll Sensitivity', "Scrolling speed multiplier when pressing `Alt`.")
 		},
+		[defaultFindModeSettingKey]: {
+			type: 'string',
+			enum: ['highlight', 'filter'],
+			enumDescriptions: [
+				localize('defaultFindModeSettingKey.highlight', "Highlight elements when searching. Further up and down navigation will traverse only the highlighted elements."),
+				localize('defaultFindModeSettingKey.filter', "Filter elements when searching.")
+			],
+			default: 'highlight',
+			description: localize('defaultFindModeSettingKey', "Controls the default find mode for lists and trees in the workbench.")
+		},
 		[keyboardNavigationSettingKey]: {
 			type: 'string',
 			enum: ['simple', 'highlight', 'filter'],
@@ -1325,7 +1375,9 @@ configurationRegistry.registerConfiguration({
 				localize('keyboardNavigationSettingKey.filter', "Filter keyboard navigation will filter out and hide all the elements which do not match the keyboard input.")
 			],
 			default: 'highlight',
-			description: localize('keyboardNavigationSettingKey', "Controls the keyboard navigation style for lists and trees in the workbench. Can be simple, highlight and filter.")
+			description: localize('keyboardNavigationSettingKey', "Controls the keyboard navigation style for lists and trees in the workbench. Can be simple, highlight and filter."),
+			deprecated: true,
+			deprecationMessage: localize('keyboardNavigationSettingKeyDeprecated', "Please use 'workbench.list.defaultFindMode' instead.")
 		},
 		[treeExpandMode]: {
 			type: 'string',

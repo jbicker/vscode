@@ -54,7 +54,6 @@ import { IJSONSchema } from 'vs/base/common/jsonSchema';
 import { IList } from 'vs/base/browser/ui/tree/indexTreeModel';
 import { IListService, WorkbenchObjectTree } from 'vs/platform/list/browser/listService';
 import { IContextKeyService } from 'vs/platform/contextkey/common/contextkey';
-import { IAccessibilityService } from 'vs/platform/accessibility/common/accessibility';
 import { ILogService } from 'vs/platform/log/common/log';
 import { settingsMoreActionIcon } from 'vs/workbench/contrib/preferences/browser/preferencesIcons';
 import { IWorkbenchConfigurationService } from 'vs/workbench/services/configuration/common/configuration';
@@ -2334,7 +2333,6 @@ export class SettingsTree extends WorkbenchObjectTree<SettingsTreeElement> {
 		@IListService listService: IListService,
 		@IThemeService themeService: IThemeService,
 		@IConfigurationService configurationService: IConfigurationService,
-		@IAccessibilityService accessibilityService: IAccessibilityService,
 		@IInstantiationService instantiationService: IInstantiationService,
 		@ILanguageService languageService: ILanguageService
 	) {
@@ -2360,7 +2358,6 @@ export class SettingsTree extends WorkbenchObjectTree<SettingsTreeElement> {
 			listService,
 			themeService,
 			configurationService,
-			accessibilityService,
 		);
 
 		this.disposables.add(registerThemingParticipant((theme: IColorTheme, collector: ICssStyleCollector) => {
