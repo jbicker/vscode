@@ -7,7 +7,7 @@ import { KeyMod, KeyCode } from 'vs/base/common/keyCodes';
 import { ServicesAccessor } from 'vs/platform/instantiation/common/instantiation';
 import { KeybindingsRegistry, KeybindingWeight } from 'vs/platform/keybinding/common/keybindingsRegistry';
 import { List } from 'vs/base/browser/ui/list/listWidget';
-import { WorkbenchListFocusContextKey, IListService, WorkbenchListSupportsMultiSelectContextKey, ListWidget, WorkbenchListHasSelectionOrFocus, getSelectionKeyboardEvent, WorkbenchListWidget, WorkbenchListSelectionNavigation, WorkbenchTreeElementCanCollapse, WorkbenchTreeElementHasParent, WorkbenchTreeElementHasChild, WorkbenchTreeElementCanExpand, RawWorkbenchListFocusContextKey, WorkbenchTreeTypeFilterEnabled } from 'vs/platform/list/browser/listService';
+import { WorkbenchListFocusContextKey, IListService, WorkbenchListSupportsMultiSelectContextKey, ListWidget, WorkbenchListHasSelectionOrFocus, getSelectionKeyboardEvent, WorkbenchListWidget, WorkbenchListSelectionNavigation, WorkbenchTreeElementCanCollapse, WorkbenchTreeElementHasParent, WorkbenchTreeElementHasChild, WorkbenchTreeElementCanExpand, RawWorkbenchListFocusContextKey, WorkbenchTreeFindOpen } from 'vs/platform/list/browser/listService';
 import { PagedList } from 'vs/base/browser/ui/list/listPaging';
 import { equals, range } from 'vs/base/common/arrays';
 import { ContextKeyExpr } from 'vs/platform/contextkey/common/contextkey';
@@ -634,7 +634,7 @@ CommandsRegistry.registerCommand({
 });
 
 KeybindingsRegistry.registerCommandAndKeybindingRule({
-	id: 'list.filter',
+	id: 'list.find',
 	weight: KeybindingWeight.WorkbenchContrib,
 	when: RawWorkbenchListFocusContextKey,
 	primary: KeyMod.CtrlCmd | KeyCode.KeyF,
@@ -649,22 +649,22 @@ KeybindingsRegistry.registerCommandAndKeybindingRule({
 		// Tree
 		else if (widget instanceof AbstractTree || widget instanceof AsyncDataTree) {
 			const tree = widget;
-			tree.enableFind();
+			tree.openFind();
 		}
 	}
 });
 
 KeybindingsRegistry.registerCommandAndKeybindingRule({
-	id: 'list.hideFilter',
+	id: 'list.closeFind',
 	weight: KeybindingWeight.WorkbenchContrib,
-	when: ContextKeyExpr.and(RawWorkbenchListFocusContextKey, WorkbenchTreeTypeFilterEnabled),
+	when: ContextKeyExpr.and(RawWorkbenchListFocusContextKey, WorkbenchTreeFindOpen),
 	primary: KeyCode.Escape,
 	handler: (accessor) => {
 		const widget = accessor.get(IListService).lastFocusedList;
 
 		if (widget instanceof AbstractTree || widget instanceof AsyncDataTree) {
 			const tree = widget;
-			tree.disableFind();
+			tree.closeFind();
 		}
 	}
 });

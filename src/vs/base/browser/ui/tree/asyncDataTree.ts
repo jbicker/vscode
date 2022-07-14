@@ -341,7 +341,7 @@ export class AsyncDataTree<TInput, T, TFilterData = void> implements IDisposable
 
 	get onDidUpdateOptions(): Event<IAsyncDataTreeOptionsUpdate> { return this.tree.onDidUpdateOptions; }
 
-	get onDidChangeFindEnablement(): Event<boolean> { return this.tree.onDidChangeFindEnablement; }
+	get onDidChangeFindOpenState(): Event<boolean> { return this.tree.onDidChangeFindOpenState; }
 	get filterOnType(): boolean { return this.tree.filterOnType; }
 	get expandOnlyOnTwistieClick(): boolean | ((e: T) => boolean) {
 		if (typeof this.tree.expandOnlyOnTwistieClick === 'boolean') {
@@ -621,12 +621,12 @@ export class AsyncDataTree<TInput, T, TFilterData = void> implements IDisposable
 		this.tree.toggleKeyboardNavigation();
 	}
 
-	enableFind(): void {
-		this.tree.enableFind();
+	openFind(): void {
+		this.tree.openFind();
 	}
 
-	disableFind(): void {
-		this.tree.disableFind();
+	closeFind(): void {
+		this.tree.closeFind();
 	}
 
 	refilter(): void {

@@ -125,7 +125,7 @@ export const WorkbenchTreeElementCanCollapse = new RawContextKey<boolean>('treeE
 export const WorkbenchTreeElementHasParent = new RawContextKey<boolean>('treeElementHasParent', false);
 export const WorkbenchTreeElementCanExpand = new RawContextKey<boolean>('treeElementCanExpand', false);
 export const WorkbenchTreeElementHasChild = new RawContextKey<boolean>('treeElementHasChild', false);
-export const WorkbenchTreeTypeFilterEnabled = new RawContextKey<boolean>('treeTypeFilterEnabled', false);
+export const WorkbenchTreeFindOpen = new RawContextKey<boolean>('treeFindOpen', false);
 export const WorkbenchListAutomaticKeyboardNavigationKey = 'listAutomaticKeyboardNavigation';
 
 function createScopedContextKeyService(contextKeyService: IContextKeyService, widget: ListWidget): IContextKeyService {
@@ -1097,7 +1097,7 @@ class WorkbenchTreeInternals<TInput, T, TFilterData> {
 	private treeElementHasParent: IContextKey<boolean>;
 	private treeElementCanExpand: IContextKey<boolean>;
 	private treeElementHasChild: IContextKey<boolean>;
-	private treeTypeFilterEnabled: IContextKey<boolean>;
+	private treeFindOpen: IContextKey<boolean>;
 	private _useAltAsMultipleSelectionModifier: boolean;
 	private disposables: IDisposable[] = [];
 	private styler: IDisposable | undefined;
@@ -1131,7 +1131,7 @@ class WorkbenchTreeInternals<TInput, T, TFilterData> {
 		this.treeElementHasParent = WorkbenchTreeElementHasParent.bindTo(this.contextKeyService);
 		this.treeElementCanExpand = WorkbenchTreeElementCanExpand.bindTo(this.contextKeyService);
 		this.treeElementHasChild = WorkbenchTreeElementHasChild.bindTo(this.contextKeyService);
-		this.treeTypeFilterEnabled = WorkbenchTreeTypeFilterEnabled.bindTo(this.contextKeyService);
+		this.treeFindOpen = WorkbenchTreeFindOpen.bindTo(this.contextKeyService);
 
 		this._useAltAsMultipleSelectionModifier = useAltAsMultipleSelectionModifier(configurationService);
 
@@ -1181,7 +1181,7 @@ class WorkbenchTreeInternals<TInput, T, TFilterData> {
 			}),
 			tree.onDidChangeCollapseState(updateCollapseContextKeys),
 			tree.onDidChangeModel(updateCollapseContextKeys),
-			tree.onDidChangeFindEnablement(enabled => this.treeTypeFilterEnabled.set(enabled)),
+			tree.onDidChangeFindOpenState(enabled => this.treeFindOpen.set(enabled)),
 			configurationService.onDidChangeConfiguration(e => {
 				let newOptions: IAbstractTreeOptionsUpdate = {};
 				if (e.affectsConfiguration(multiSelectModifierSettingKey)) {

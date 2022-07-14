@@ -830,8 +830,8 @@ class FindController<T, TFilterData> implements IDisposable {
 	private readonly _onDidChangePattern = new Emitter<string>();
 	readonly onDidChangePattern = this._onDidChangePattern.event;
 
-	private readonly _onDidChangeEnablement = new Emitter<boolean>();
-	readonly onDidChangeEnablement = this._onDidChangeEnablement.event;
+	private readonly _onDidChangeOpenState = new Emitter<boolean>();
+	readonly onDidChangeOpenState = this._onDidChangeOpenState.event;
 
 	private enabledDisposables = new DisposableStore();
 	private readonly disposables = new DisposableStore();
@@ -867,7 +867,7 @@ class FindController<T, TFilterData> implements IDisposable {
 		this.render();
 	}
 
-	enable(): void {
+	open(): void {
 		if (this.widget) {
 			this.widget.focus();
 			this.widget.select();
@@ -879,15 +879,15 @@ class FindController<T, TFilterData> implements IDisposable {
 
 		this.widget.onDidChangeValue(this.onDidChangeValue, this, this.enabledDisposables);
 		this.widget.onDidChangeMode(this.onDidChangeMode, this, this.enabledDisposables);
-		this.widget.onDidDisable(this.disable, this, this.enabledDisposables);
+		this.widget.onDidDisable(this.close, this, this.enabledDisposables);
 
 		this.widget.layout(this.width);
 		this.widget.focus();
 
-		this._onDidChangeEnablement.fire(true);
+		this._onDidChangeOpenState.fire(true);
 	}
 
-	disable(): void {
+	close(): void {
 		if (!this.widget) {
 			return;
 		}
@@ -900,7 +900,7 @@ class FindController<T, TFilterData> implements IDisposable {
 		this.onDidChangeValue('');
 		this.tree.domFocus();
 
-		this._onDidChangeEnablement.fire(false);
+		this._onDidChangeOpenState.fire(false);
 	}
 
 	private onDidChangeValue(pattern: string): void {
@@ -1327,7 +1327,7 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 	private anchor: Trait<T>;
 	private eventBufferer = new EventBufferer();
 	private findController?: FindController<T, TFilterData>;
-	readonly onDidChangeFindEnablement: Event<boolean> = Event.None;
+	readonly onDidChangeFindOpenState: Event<boolean> = Event.None;
 	private focusNavigationFilter: ((node: ITreeNode<T, TFilterData>) => boolean) | undefined;
 	private styleElement: HTMLStyleElement;
 	protected readonly disposables = new DisposableStore();
@@ -1444,7 +1444,7 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 		if (_options.keyboardNavigationLabelProvider && _options.contextViewProvider) {
 			this.findController = new FindController(this, this.model, this.view, filter!, _options.contextViewProvider);
 			this.focusNavigationFilter = node => this.findController!.shouldAllowFocus(node);
-			this.onDidChangeFindEnablement = this.findController.onDidChangeEnablement;
+			this.onDidChangeFindOpenState = this.findController.onDidChangeOpenState;
 			this.disposables.add(this.findController!);
 		}
 
@@ -1634,12 +1634,12 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 		// }
 	}
 
-	enableFind(): void {
-		this.findController?.enable();
+	openFind(): void {
+		this.findController?.open();
 	}
 
-	disableFind(): void {
-		this.findController?.disable();
+	closeFind(): void {
+		this.findController?.close();
 	}
 
 	refilter(): void {
